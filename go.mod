@@ -1,3 +1,3 @@
-module github.com/CalvoM/account-management
+module github.com/CalvoM/account-management-ussd
 
 go 1.15

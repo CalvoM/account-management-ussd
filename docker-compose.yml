@@ -1,0 +1,19 @@
+version : "3.8"
+services:
+  pg_server:
+    image: "postgres:latest"
+    container_name: "at_acc_pg"
+    ports:
+      - "5431:5432"
+    env_file:
+      - .env
+  redis_server:
+    image: "redis:latest"
+    container_name: "at_acc_redis"
+    ports:
+      - "6378:6379"
+
+networks:
+  default:
+    external:
+      name: at-acc-net
