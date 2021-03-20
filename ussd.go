@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/CalvoM/account-management-ussd/models"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
@@ -13,12 +14,14 @@ type USSDState int
 const (
 	Begin USSDState = iota
 	GetOption
-	RegGetEmail
+	RegGetEmail //Registration Option states
 	RegGetusername
 	RegDoneOK
+	VGGetEmail //Get from vault Option states
 	VGGetPassword
 	VGGetContent
 	VGDoneOK
+	VSGetEmail //Add to vault Option state
 	VSGetPassword
 	VSSetContent
 	VSDoneOK
@@ -49,15 +52,15 @@ type EndSessionDetails struct {
 func generateUSSDResponse(text string, session SessionDetails) (resp string) {
 	data, err := redisClient.HGet(session.SessionID, "state").Result()
 	if err != nil { //Session Handling err
-		return "END Error Detected."
+		return "END Error detected."
 	}
 	i, err := strconv.Atoi(data)
 	if err != nil { //Session Handling err
-		return "END Error Detected."
+		return "END Error detected."
 	}
 	ussdState := USSDState(i)
 	if text == "" && ussdState != Begin { //If user does not supply input and it is not start
-		resp += "END Error Detected.\nPlease provide an input."
+		resp += "END Error detected.\nPlease provide an input."
 		ussdState = Begin
 		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
 			return
@@ -85,13 +88,13 @@ func generateUSSDResponse(text string, session SessionDetails) (resp string) {
 			}
 			resp = handleRegistration(session, ussdState)
 		} else if text == "2" {
-			ussdState = VSGetPassword
+			ussdState = VSGetEmail
 			if err := updateRedisSession(ussdState, session.SessionID); err != nil {
 				return "END Error detected."
 			}
 			resp = handleUpdateVault(session, ussdState)
 		} else if text == "3" {
-			ussdState = VGGetPassword
+			ussdState = VGGetEmail
 			if err := updateRedisSession(ussdState, session.SessionID); err != nil {
 				return "END Error detected."
 			}
@@ -102,9 +105,9 @@ func generateUSSDResponse(text string, session SessionDetails) (resp string) {
 	case ussdState >= RegGetEmail && ussdState <= RegDoneOK:
 		resp = handleRegistration(session, ussdState)
 
-	case ussdState >= VSGetPassword && ussdState <= VSDoneOK:
+	case ussdState >= VSGetEmail && ussdState <= VSDoneOK:
 		resp = handleUpdateVault(session, ussdState)
-	case ussdState >= VGGetPassword && ussdState <= VGDoneOK:
+	case ussdState >= VGGetEmail && ussdState <= VGDoneOK:
 		resp = handleGetVaultItems(session, ussdState)
 	}
 
@@ -119,32 +122,98 @@ func handleRegistration(session SessionDetails, state USSDState) (resp string) {
 		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
 			return "END Error detected."
 		}
+
 	case RegGetusername:
-		resp = "CON Please enter your user name"
-		ussdState := RegDoneOK
-		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
-			return "END Error detected."
+		email := getUserChoice(session.Text)
+		u := models.User{Email: email}
+		if models.IsUserEmailInDb(&u) { // Email is unique
+			resp = "END Email already registered"
+		} else {
+			if err := updateSessionDetails("email", email, session.SessionID); err != nil {
+				resp = "END Error detected."
+			}
+			resp = "CON Please enter your user name"
+			ussdState := RegDoneOK
+			if err := updateRedisSession(ussdState, session.SessionID); err != nil {
+				return "END Error detected."
+			}
 		}
 	case RegDoneOK:
+		username := getUserChoice(session.Text)
+		email, err := redisClient.HGet(session.SessionID, "email").Result()
+		if err != nil {
+			return "END Error detected."
+		}
+		if err = updateSessionDetails("name", username, session.SessionID); err != nil {
+			return "END Error detected."
+		}
+		user := models.User{
+			Name:     username,
+			Email:    email,
+			Password: "0",
+		}
+		if _, err := user.AddUser(); err != nil {
+			return "END Error detected."
+		}
 		resp = "END You will receive an SMS to complete registration."
+
 	}
 	return
 }
 func handleUpdateVault(session SessionDetails, state USSDState) (resp string) {
 	switch state {
+	case VSGetEmail:
+		resp = "CON Enter email"
+		ussdState := VSGetPassword
+		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
+			return "END Error detected."
+		}
+
 	case VSGetPassword:
 		resp = "CON Enter password"
+		email := getUserChoice(session.Text)
+		if err := updateSessionDetails("email", email, session.SessionID); err != nil {
+			return "END Error detected."
+		}
 		ussdState := VSSetContent
 		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
 			return "END Error detected."
 		}
 	case VSSetContent:
+		password := getUserChoice(session.Text)
+		email, err := redisClient.HGet(session.SessionID, "email").Result()
+		if err != nil {
+			return "END Error detected."
+		}
+		id, err := models.AuthenticateUser(email, password)
+		if err != nil {
+			return "END Authentication Failed."
+		}
+		if err := updateSessionDetails("user-id", strconv.Itoa(int(id)), session.SessionID); err != nil {
+			return "END Error detected."
+		}
 		resp = "CON Enter item to save to the vault"
 		ussdState := VSDoneOK
 		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
 			return "END Error detected."
 		}
 	case VSDoneOK:
+		vault_content := getUserChoice(session.Text)
+		id, err := redisClient.HGet(session.SessionID, "user-id").Result()
+		if err != nil {
+			return "END Error detected."
+		}
+		user_id, err := strconv.Atoi(id)
+		if err != nil {
+			return "END Error detected."
+		}
+		vault := models.Vault{
+			UserID:  int64(user_id),
+			Content: vault_content,
+		}
+		if _, err := vault.AddToVault(); err != nil {
+			return "END Could not save to vault."
+		}
 		resp = "END Your vault has been updated"
 	}
 	return
@@ -152,13 +221,41 @@ func handleUpdateVault(session SessionDetails, state USSDState) (resp string) {
 
 func handleGetVaultItems(session SessionDetails, state USSDState) (resp string) {
 	switch state {
+	case VGGetEmail:
+		resp = "CON Enter email"
+		ussdState := VGGetPassword
+		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
+			return "END Error detected."
+		}
 	case VGGetPassword:
 		resp = "CON Enter password"
+		email := getUserChoice(session.Text)
+		if err := updateSessionDetails("email", email, session.SessionID); err != nil {
+			return "END Error detected."
+		}
 		ussdState := VGGetContent
 		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
 			return "END Error detected."
 		}
 	case VGGetContent:
+		password := getUserChoice(session.Text)
+		email, err := redisClient.HGet(session.SessionID, "email").Result()
+		if err != nil {
+			return "END Error detected."
+		}
+		id, err := models.AuthenticateUser(email, password)
+		if err != nil {
+			return "END Authentication Failed."
+		}
+		if err := updateSessionDetails("user-id", strconv.Itoa(int(id)), session.SessionID); err != nil {
+			return "END Error detected."
+		}
+		v := models.Vault{}
+		vaults, err := v.GetVaultByUserID(id)
+		if err != nil {
+			return "END Error Retrieving items."
+		}
+		fmt.Println(vaults)
 		resp = "END Sending items via SMS"
 		ussdState := VGDoneOK
 		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
@@ -167,6 +264,8 @@ func handleGetVaultItems(session SessionDetails, state USSDState) (resp string) 
 	}
 	return
 }
+
+//getUserChoice splits the text sent to callback since all user text is joined by *
 func getUserChoice(text string) string {
 	vals := strings.Split(text, "*")
 	return vals[len(vals)-1]
@@ -175,6 +274,11 @@ func getUserChoice(text string) string {
 func updateRedisSession(state USSDState, sessionID string) error {
 	stateStr := strconv.Itoa(int(state))
 	err := redisClient.HSet(sessionID, "state", stateStr).Err()
+	return err
+}
+
+func updateSessionDetails(key, value, sessionID string) error {
+	err := redisClient.HSet(sessionID, key, value).Err()
 	return err
 }
 
