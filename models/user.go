@@ -62,14 +62,14 @@ func (user *User) AddUser() (id int64, err error) {
 		err = errors.New("User in DB")
 		return
 	}
-	stmt, err := db.DbClient.Prepare("INSERT INTO reg_users(username,email,password) VALUES($1,$2,$3) RETURNING user_id;")
+	stmt, err := db.DbClient.Prepare("INSERT INTO reg_users(username,email,password,registered) VALUES($1,$2,$3,$4) RETURNING user_id;")
 	if err != nil {
 		log.Error(err)
 		return
 	}
 	defer stmt.Close()
 	user.HashUserPassword()
-	err = stmt.QueryRow(user.Name, user.Email, user.Password).Scan(&id)
+	err = stmt.QueryRow(user.Name, user.Email, user.Password, true).Scan(&id)
 	if err != nil {
 		log.Error(err)
 		return
@@ -132,4 +132,27 @@ func (user *User) HashUserPassword() {
 func (user *User) CheckUserPassword(suppliedPassword string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(suppliedPassword))
 	return err == nil
+}
+
+//AuthenticateUser check if the user of email and password provided is in the DB
+func AuthenticateUser(email, suppliedPassword string) (id int64, err error) {
+	stmt, err := db.DbClient.Prepare("select * from reg_users where email=$1")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	user := User{}
+	err = stmt.QueryRow(email).Scan(&user.ID, &user.Name, &user.Password, &user.Email, &user.Registered, &user.Activated)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	if userPresent := user.CheckUserPassword(suppliedPassword); userPresent != true {
+		return -1, errors.New("Password do not match")
+	}
+	if user.Activated == false {
+		return -1, errors.New("User not activated")
+	}
+	id = user.ID
+	return
 }
