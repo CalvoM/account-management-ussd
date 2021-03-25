@@ -152,10 +152,20 @@ func handleRegistration(session SessionDetails, state USSDState) (resp string) {
 			Email:    email,
 			Password: "0",
 		}
-		if _, err := user.AddUser(); err != nil {
+		id, err := user.AddUser()
+		if err != nil {
 			return "END Error detected."
 		}
-		resp = "END You will receive an SMS to complete registration."
+		resp = "END You will receive an SMS to complete registration.."
+		token, err := CreateToken(id)
+		if err != nil {
+			return "END Error detected."
+		}
+		server := "http://0306b42f430e.ngrok.io"
+		endpoint := "/?token=" + token + "&uid=" + strconv.Itoa(int(id))
+		url := server + endpoint
+		log.Info(server)
+		NotifyByATSMS(session, "Registration Complete.\n\rPlease activate at "+url)
 
 	}
 	return

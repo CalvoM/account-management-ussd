@@ -1,0 +1,20 @@
+{{define "style"}}
+    <link rel="stylesheet" href="/ui/styles/main.css">
+{{end}}
+{{define "body"}}
+<h1>Home</h1>
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Email</th>
+    </tr>
+    {{range $val:=.}}
+    <tr>
+        <td>{{$val.ID}}</td>
+        <td>{{$val.Name}}</td>
+        <td>{{$val.Email}}</td>
+    </tr>
+    {{end}}
+</table>
+{{end}}

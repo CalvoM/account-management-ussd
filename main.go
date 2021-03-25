@@ -33,8 +33,12 @@ func main() {
 	}
 	log.Info("Started Redis successfully")
 	r := mux.NewRouter()
+	fs := http.FileServer(http.Dir("./ui"))
+	r.PathPrefix("/ui/").Handler(http.StripPrefix("/ui/", fs))
 	r.Path("/ussd/end_note/").HandlerFunc(USSDEndNotificationHandler).Methods("POST")
 	r.Path("/ussd/").HandlerFunc(USSDHandler).Methods("POST")
+	r.Path("/msg/").HandlerFunc(SMSHandler).Methods("POST")
+	r.PathPrefix("/").HandlerFunc(serveUi)
 	srv := &http.Server{
 		Handler: r,
 		Addr:    "127.0.0.1:8083",

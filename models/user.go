@@ -104,7 +104,7 @@ func GetAllUsers() (users []User, err error) {
 	defer rows.Close()
 	for rows.Next() {
 		u := User{}
-		if err := rows.Scan(&u.ID, &u.Name, &u.Email); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Password, &u.Email, &u.Registered, &u.Activated); err != nil {
 			log.Error(err)
 			return users, err
 		}
