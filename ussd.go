@@ -126,7 +126,8 @@ func handleRegistration(session SessionDetails, state USSDState) (resp string) {
 	case RegGetusername:
 		email := getUserChoice(session.Text)
 		u := models.User{Email: email}
-		if models.IsUserEmailInDb(&u) { // Email is unique
+		ok, _ := models.IsUserEmailInDb(&u)
+		if ok { // Email is unique
 			resp = "END Email already registered"
 		} else {
 			if err := updateSessionDetails("email", email, session.SessionID); err != nil {
@@ -161,10 +162,9 @@ func handleRegistration(session SessionDetails, state USSDState) (resp string) {
 		if err != nil {
 			return "END Error detected."
 		}
-		server := "http://0306b42f430e.ngrok.io"
+		server := "http://946f79474c31.ngrok.io"
 		endpoint := "/?token=" + token + "&uid=" + strconv.Itoa(int(id))
 		url := server + endpoint
-		log.Info(server)
 		NotifyByATSMS(session, "Registration Complete.\n\rPlease activate at "+url)
 
 	}
@@ -266,6 +266,15 @@ func handleGetVaultItems(session SessionDetails, state USSDState) (resp string) 
 			return "END Error Retrieving items."
 		}
 		fmt.Println(vaults)
+		if len(vaults) == 0 {
+			NotifyByATSMS(session, "You have not saved anything yet")
+		} else {
+			var content string
+			for i, c := range vaults {
+				content += fmt.Sprintf("%d. %s\r\n", i+1, c.Content)
+			}
+			NotifyByATSMS(session, content)
+		}
 		resp = "END Sending items via SMS"
 		ussdState := VGDoneOK
 		if err := updateRedisSession(ussdState, session.SessionID); err != nil {
