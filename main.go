@@ -38,6 +38,7 @@ func main() {
 	r.Path("/ussd/end_note/").HandlerFunc(USSDEndNotificationHandler).Methods("POST")
 	r.Path("/ussd/").HandlerFunc(USSDHandler).Methods("POST")
 	r.Path("/msg/").HandlerFunc(SMSHandler).Methods("POST")
+	r.Path("/update_password/").HandlerFunc(UpdatePassword).Methods("POST")
 	r.PathPrefix("/").HandlerFunc(serveUi)
 	srv := &http.Server{
 		Handler: r,
