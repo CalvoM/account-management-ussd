@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 	"os"
@@ -8,8 +10,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CalvoM/account-management-ussd/models"
 	log "github.com/sirupsen/logrus"
 )
+
+type userUpdate struct {
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	ConfirmPasword string `json:"confirm"`
+}
 
 func serveUi(w http.ResponseWriter, r *http.Request) {
 	basePath := filepath.Join("ui", "templates", "base.html")
@@ -28,35 +37,63 @@ func serveUi(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if int64(i_uid) != _uid {
-			log.Info(_uid, int64(i_uid))
 			http.Error(w, "Auth Error", http.StatusBadRequest)
 			return
 		}
 		parts := strings.Split(urlPath, "/?")
 		urlPath = parts[0] + "login.html"
-	} else {
-		urlPath += "index.html"
-	}
-	reqPath := filepath.Join("ui", "templates", filepath.Clean(urlPath))
-	info, err := os.Stat(reqPath)
-	if err != nil {
-		log.Error("Error=>", err)
-		if os.IsNotExist(err) {
+		reqPath := filepath.Join("ui", "templates", filepath.Clean(urlPath))
+		info, err := os.Stat(reqPath)
+		if err != nil {
+			log.Error("Error=>", err)
+			if os.IsNotExist(err) {
+				http.NotFound(w, r)
+				return
+			}
+		}
+		if info.IsDir() {
 			http.NotFound(w, r)
 			return
 		}
+		tmpl, err := template.ParseFiles(basePath, reqPath)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		err = tmpl.ExecuteTemplate(w, "base", token)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+	} else {
+		fmt.Fprint(w, "Welcome to the this APP")
 	}
-	if info.IsDir() {
-		http.NotFound(w, r)
+}
+
+func UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	var u userUpdate
+	token := r.Header.Get("Authorization")
+	acc_token := strings.Split(token, " ")[1]
+	uid, err := ValidateToken(acc_token)
+	if err != nil {
+		log.Error(err)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-	tmpl, err := template.ParseFiles(basePath, reqPath)
+	err = json.NewDecoder(r.Body).Decode(&u)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Error(err)
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
 	}
-	err = tmpl.ExecuteTemplate(w, "base", "Test")
+	user := models.User{
+		Email: u.Email,
+		ID:    uid,
+	}
+	err = user.UpdateUserPassword(u.Password)
 	if err != nil {
-		log.Fatal(err.Error())
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
 	}
-
+	fmt.Fprint(w, "Okay")
+	return
 }
