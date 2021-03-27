@@ -38,12 +38,12 @@ func IsUserInDb(u *User) (isUserPresent bool) {
 }
 
 //IsUserEmailInDb check if email in db
-func IsUserEmailInDb(u *User) bool {
-	rows := db.DbClient.QueryRow(`select * from reg_users where email=$1;`, u.Email)
+func IsUserEmailInDb(u *User) (bool, int64) {
+	rows := db.DbClient.QueryRow(`select user_id from reg_users where email=$1;`, u.Email)
 	var user = User{}
 	var isUser bool
 	isUser = false
-	switch err := rows.Scan(&user.ID, &user.Name, &user.Email); err {
+	switch err := rows.Scan(&user.ID); err {
 	case sql.ErrNoRows:
 		log.Warn("User not found")
 	case nil:
@@ -53,7 +53,7 @@ func IsUserEmailInDb(u *User) bool {
 		log.Error("Error getting user ", err)
 		isUser = true
 	}
-	return isUser
+	return isUser, user.ID
 }
 
 //AddUser adds user to the databse
@@ -75,7 +75,34 @@ func (user *User) AddUser() (id int64, err error) {
 		return
 	}
 	user.ID = id
-	log.Info("Added User with ID ", user.ID)
+	return
+}
+
+func (user *User) UpdateUserPassword(password string) (err error) {
+	ok, id := IsUserEmailInDb(user)
+	if ok == false {
+		return errors.New("Email not found in system")
+	}
+	if id != user.ID {
+		return errors.New("User ids do not match!")
+	}
+	var temp_id int64
+	user.Password = password
+	user.HashUserPassword()
+	stmt, err := db.DbClient.Prepare("update reg_users set password=$1,activated=$2 where user_id=$3 returning user_id;")
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	err = stmt.QueryRow(user.Password, true, user.ID).Scan(&temp_id)
+	if err != nil {
+		log.Error("SQL ROW ", err)
+		return
+	}
+	if temp_id != user.ID {
+		return errors.New("DB operation error")
+	}
 	return
 }
 
@@ -91,7 +118,6 @@ func (user *User) RemoveUser() (err error) {
 		log.Error(err)
 		return err
 	}
-	log.Info(rows.Columns())
 	return nil
 }
 
