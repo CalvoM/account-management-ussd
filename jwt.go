@@ -33,7 +33,6 @@ func CreateToken(user_id int64) (token string, err error) {
 		log.Error(err)
 		return
 	}
-	log.Info(token)
 	return
 }
 
