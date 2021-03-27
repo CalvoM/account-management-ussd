@@ -3,9 +3,39 @@
 {{end}}
 {{define "body"}}
 <h1>Login</h1>
-<form action="">
-    <input id="" type="text" name="" placeholder="Enter email">
-    <input id="" type="password" name="" placeholder="Enter password">
-    <input id="" type="password" name="" placeholder="Confirm password">
+<form>
+    <input id="email" type="text" name="" placeholder="Enter email" required>
+    <input id="password" type="password" name="" placeholder="Enter password" required>
+    <input id="conPas" type="password" name="" placeholder="Confirm password" required>
+    <input type="submit" value="UPDATE PASSWORD">
 </form>
+<script>
+    let form_ = document.querySelector("form");
+    let email = document.querySelector("input#email");
+    let password = document.querySelector("input#password");
+    let confirmPassword = document.querySelector("input#conPas");
+    let access_token = {{.}}
+
+    form_.addEventListener("submit",function(event){
+            event.preventDefault()
+            if(password.value !== confirmPassword.value){
+                    alert("Passwords not same.")
+                    password.value = ""
+                    confirmPassword.value = ""
+                    return false
+                }
+            fetch("http://946f79474c31.ngrok.io/update_password/",
+                { 
+                method: "post",
+                headers:{
+                        "Authorization":"Bearer "+access_token,
+                        "Content-Type": "application/json"
+                    },
+                        body: JSON.stringify({email:email.value,password:password.value,confirm:confirmPassword.value})}
+            ).then(resp => {
+            console.log(resp)
+            })
+            return false
+    })
+</script>
 {{end}}
