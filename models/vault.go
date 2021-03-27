@@ -26,7 +26,6 @@ func (v *Vault) AddToVault() (id int64, err error) {
 		return
 	}
 	v.ID = id
-	log.Info("Added vault with ID ", v.ID)
 	return
 }
 
