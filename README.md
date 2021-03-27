@@ -37,3 +37,20 @@ go run *.go
 ngrok http 8083
 ```
 4. Enjoy and update where you see fit.
+
+### Environment variables
+
+Have a file **.env** with the following the variable defined
+```sh
+POSTGRES_PASSWORD
+POSTGRES_USER
+POSTGRES_DB
+AT_APIKEY
+AT_USERNAME
+AT_SMS_SHORTCODE
+AT_ENV
+DB_HOST
+PG_PORT
+REDIS_PORT
+SECRET
+```

@@ -113,7 +113,7 @@ func (user *User) RemoveUser() (err error) {
 		log.Error(err)
 		return err
 	}
-	rows, err := stmt.Query(user.Name, user.Email)
+	_, err = stmt.Query(user.Name, user.Email)
 	if err != nil {
 		log.Error(err)
 		return err
