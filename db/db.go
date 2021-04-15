@@ -15,6 +15,8 @@ var (
 	Ctx      context.Context
 )
 
+//go:generate go run ../update.go ../.env DB_HOST PG_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB
+
 func init() {
 	Ctx = context.TODO()
 	viper.SetConfigFile(".env")

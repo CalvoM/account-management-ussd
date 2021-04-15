@@ -12,6 +12,7 @@ type UserClaims struct {
 	jwt.StandardClaims
 }
 
+//go:generate go run update.go .env SECRET
 func CreateToken(user_id int64) (token string, err error) {
 	viper.SetConfigFile("./.env")
 	err = viper.ReadInConfig()

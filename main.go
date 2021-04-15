@@ -10,6 +10,7 @@ import (
 
 var redisClient *redis.Client
 
+//go:generate go run update.go .env REDIS_PORT
 func main() {
 	log.Info("USSD app server starting")
 	viper.SetConfigFile("./.env")

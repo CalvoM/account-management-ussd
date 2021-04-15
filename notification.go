@@ -14,6 +14,8 @@ func SMSHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Good")
 }
 
+//go:generate go run update.go .env AT_USERNAME AT_APIKEY AT_ENV
+
 //NotifyByATSMS send notification using AT's SMS service
 func NotifyByATSMS(session SessionDetails, message string) {
 	viper.SetConfigFile("./.env")
